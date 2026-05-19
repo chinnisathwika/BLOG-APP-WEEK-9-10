@@ -34,7 +34,7 @@ const isAllowedOrigin = (origin) => {
   }
 };
 
-// Use CORS middleware
+// Use CORS middleware with explicit header support
 app.use(
   cors({
     origin(origin, callback) {
@@ -44,6 +44,7 @@ app.use(
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
   }),
 );
 

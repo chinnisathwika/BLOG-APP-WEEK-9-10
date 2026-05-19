@@ -8,15 +8,57 @@ import { uploadToCloudinary } from "../config/cloudinaryUpload.js";
 
 export const userRoute = exp.Router();
 
-//Register user
+// ==========================================
+// 🔐 AUTHENTICATION ROUTES (ADD THIS)
+// ==========================================
+
+// Login User & Set Secure Cross-Domain Cookie
+userRoute.post("/login", async (req, res, next) => {
+  try {
+    const { username, password } = req.body;
+    
+    // Authenticate user (calls your existing service to check password & generate token)
+    const { user, token } = await authenticate({ username, password });
+
+    // ⚠️ CRITICAL FIX: Configure cookie to bypass cross-domain (Vercel to Render) restrictions
+    res.cookie("token", token, {
+      httpOnly: true,         // Protects against XSS attacks
+      secure: true,           // Required for HTTPS (Render production env)
+      sameSite: "none",       // Required for cross-site cookie transfers
+      maxAge: 24 * 60 * 60 * 1000, // Cookie expires in 1 day
+    });
+
+    res.status(200).json({
+      message: "Login success",
+      payload: user,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Logout User & Clear Cookie
+userRoute.post("/logout", (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+  });
+  res.status(200).json({ message: "Logged out successfully" });
+});
+
+// ==========================================
+// 📝 USER & ARTICLE ROUTES
+// ==========================================
+
+// Register user
 userRoute.post("/users", upload.single("profileImageUrl"), async (req, res, next) => {
   let cloudinaryResult;
 
   try {
-    //getb user obj
     let userObj = req.body;
 
-    //  Step 1: upload image to cloudinary from memoryStorage (if exists)
+    // Step 1: upload image to cloudinary from memoryStorage (if exists)
     if (req.file) {
       cloudinaryResult = await uploadToCloudinary(req.file.buffer);
     }
@@ -33,46 +75,50 @@ userRoute.post("/users", upload.single("profileImageUrl"), async (req, res, next
       payload: newUserObj,
     });
   } catch (err) {
-    // Step 3: rollback
+    // Step 3: rollback on failure
     if (cloudinaryResult?.public_id) {
       await cloudinary.uploader.destroy(cloudinaryResult.public_id);
     }
-
-    next(err); // send to your error middleware
+    next(err); 
   }
 });
 
-//Read all articles(protected route)
-userRoute.get("/articles", verifyToken("USER"), async (req, res) => {
-  //read articles of all authors which are active
-  const articles = await ArticleModel.find({ isArticleActive: true }).populate("author");
-  //send res
-  res.status(200).json({ message: "all articles", payload: articles });
+// Read all articles (protected route)
+userRoute.get("/articles", verifyToken("USER"), async (req, res, next) => {
+  try {
+    // Read articles of all authors which are active
+    const articles = await ArticleModel.find({ isArticleActive: true }).populate("author");
+    res.status(200).json({ message: "all articles", payload: articles });
+  } catch (err) {
+    next(err);
+  }
 });
 
-//Add comment to an article(protected route)
-userRoute.put("/articles", verifyToken("USER"), async (req, res) => {
-  //get comment obj from req
-  const { user, articleId, comment } = req.body;
-  //check user(req.user)
-  console.log(req.user);
-  if (user !== req.user.userId) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-  //find artcleby id and update
-  let articleWithComment = await ArticleModel.findOneAndUpdate(
-    { _id: articleId, isArticleActive: true },
-    { $push: { comments: { user, comment } } },
-    { new: true, runValidators: true },
-  );
+// Add comment to an article (protected route)
+userRoute.put("/articles", verifyToken("USER"), async (req, res, next) => {
+  try {
+    // Get comment obj from req
+    const { user, articleId, comment } = req.body;
+    
+    // Check if the performing user matches the authenticated user ID
+    if (user !== req.user.userId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
 
-  //if article not found
-  if (!articleWithComment) {
-    return res.status(404).json({ message: "Article not found" });
+    // Find article by id and update
+    let articleWithComment = await ArticleModel.findOneAndUpdate(
+      { _id: articleId, isArticleActive: true },
+      { $push: { comments: { user, comment } } },
+      { new: true, runValidators: true },
+    );
+
+    // If article not found
+    if (!articleWithComment) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+    res.status(200).json({ message: "comment added successfully", payload: articleWithComment });
+  } catch (err) {
+    next(err);
   }
-  //send res
-  res.status(200).json({ message: "comment added successfully", payload: articleWithComment });
 });
-
-//next() ---> next middleware
-//next(err) ---> error handling middleware
