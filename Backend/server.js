@@ -13,7 +13,24 @@ config(); //process.env
 //Create express application
 const app = exp();
 //use cors middleware
-app.use(cors({ origin: ["http://localhost:5173"], credentials: true }));
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://blog-app-week-9-10.vercel.app",
+  ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(",").map((origin) => origin.trim()) : []),
+];
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  }),
+);
 //add body parser middleware
 app.use(exp.json());
 //add cookie parser middleware
@@ -32,7 +49,8 @@ const connectDB = async () => {
     console.log("DB connection success");
 
     //start http server
-    app.listen(process.env.PORT, () => console.log(`server started on port ${process.env.PORT}`));
+    const port = process.env.PORT || 4000;
+    app.listen(port, () => console.log(`server started on port ${port}`));
   } catch (err) {
     console.log("Err in DB connection", err);
   }

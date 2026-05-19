@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router";
 import { useEffect } from "react";
 import axios from "axios";
+import { apiUrl } from "../config/api";
 
 import {
   formCard,
@@ -38,7 +39,7 @@ function EditArticle() {
   const updateArticle = async (data) => {
     console.log(data);
     data.articleId = article._id;
-    let res = await axios.put("http://localhost:4000/author-api/articles", data, { withCredentials: true });
+    let res = await axios.put(apiUrl("/author-api/articles"), data, { withCredentials: true });
     console.log("res update atricle", res);
     navigate(`/article/${article._id}`, {
       state: res.data.payload,
