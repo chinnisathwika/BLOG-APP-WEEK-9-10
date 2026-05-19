@@ -2,6 +2,16 @@ import jwt from "jsonwebtoken";
 import { config } from "dotenv";
 config();
 
+const getJwtSecret = () => {
+  if (!process.env.JWT_SECRET) {
+    const err = new Error("JWT_SECRET is missing in backend environment variables");
+    err.status = 500;
+    throw err;
+  }
+
+  return process.env.JWT_SECRET;
+};
+
 export const verifyToken = (...allowedRoles) => {
   return async (req, res, next) => {
     try {
@@ -12,7 +22,7 @@ export const verifyToken = (...allowedRoles) => {
       }
 
       // Verify and decode token
-      const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+      const decodedToken = jwt.verify(token, getJwtSecret());
 
       // Check if role is allowed
       if (!allowedRoles.includes(decodedToken.role)) {
@@ -31,7 +41,7 @@ export const verifyToken = (...allowedRoles) => {
       if (err.name === "JsonWebTokenError") {
         return res.status(401).json({ message: "Invalid token. Please login again" });
       }
-     // next(err);
+      next(err);
     }
   };
 };

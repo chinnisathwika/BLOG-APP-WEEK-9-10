@@ -4,6 +4,16 @@ import { UserTypeModel } from "../models/UserModel.js";
 import {config} from 'dotenv'
 config()
 
+const getJwtSecret = () => {
+  if (!process.env.JWT_SECRET) {
+    const err = new Error("JWT_SECRET is missing in backend environment variables");
+    err.status = 500;
+    throw err;
+  }
+
+  return process.env.JWT_SECRET;
+};
+
 //register function
 export const register = async (userObj) => {
   //Create document
@@ -50,7 +60,7 @@ export const authenticate = async ({ email, password }) => {
   //generate token
   const token = jwt.sign({ userId: user._id, 
     role: user.role, email: user.email }, 
-    process.env.JWT_SECRET, {
+    getJwtSecret(), {
     expiresIn: "1h",
   });
 
