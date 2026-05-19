@@ -36,6 +36,14 @@ app.use(exp.json());
 //add cookie parser middleware
 app.use(cookieParser());
 
+app.get("/", (req, res) => {
+  res.status(200).json({
+    message: "Blog API is running",
+    frontend: "https://blog-app-week-9-10.vercel.app",
+    endpoints: ["/user-api", "/author-api", "/admin-api", "/common-api"],
+  });
+});
+
 //connect APIs
 app.use("/user-api", userRoute);
 app.use("/author-api", authorRoute);
