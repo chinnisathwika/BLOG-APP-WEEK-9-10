@@ -8,11 +8,13 @@ import { authorRoute } from "./APIs/AuthorAPI.js";
 import { commonRouter } from "./APIs/CommonAPI.js";
 import cors from "cors";
 
-config(); //process.env
+// Load environment variables
+config(); 
 
-//Create express application
 const app = exp();
-//use cors middleware
+const PORT = process.env.PORT || 4000;
+
+// Configure allowed CORS origins
 const allowedOrigins = [
   "http://localhost:5173",
   "https://blog-app-week-9-10.vercel.app",
@@ -20,34 +22,36 @@ const allowedOrigins = [
 ];
 
 const isAllowedOrigin = (origin) => {
-  if (!origin) return true;
+  if (!origin) return true; // Allows tools like Postman or server-to-server requests
   if (allowedOrigins.includes(origin)) return true;
 
   try {
     const url = new URL(origin);
+    // Allow Vercel preview deployments dynamically
     return url.protocol === "https:" && url.hostname.startsWith("blog-app-week-9-10-") && url.hostname.endsWith(".vercel.app");
   } catch {
     return false;
   }
 };
 
+// Use CORS middleware
 app.use(
   cors({
     origin(origin, callback) {
       if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
-
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
   }),
 );
-//add body parser middleware
+
+// Body parser and cookie parser middlewares
 app.use(exp.json());
-//add cookie parser middleware
 app.use(cookieParser());
 
+// Base landing route
 app.get("/", (req, res) => {
   res.status(200).json({
     message: "Blog API is running",
@@ -56,41 +60,27 @@ app.get("/", (req, res) => {
   });
 });
 
-//connect APIs
+// Connect application sub-routers
 app.use("/user-api", userRoute);
 app.use("/author-api", authorRoute);
 app.use("/admin-api", adminRoute);
 app.use("/common-api", commonRouter);
 
-//connect to db
-const connectDB = async () => {
-  try {
-    await connect(process.env.DB_URL);
-    console.log("DB connection success");
-
-    //start http server
-    const port = process.env.PORT || 4000;
-    app.listen(port, () => console.log(`server started on port ${port}`));
-  } catch (err) {
-    console.log("Err in DB connection", err);
-  }
-};
-
-connectDB();
-
-//dealing with invalid path
+// Handle invalid application paths
 app.use((req, res, next) => {
-  console.log(req.url);
-  res.json({ message: `${req.url} is invalid path` });
+  console.log(`404 - Invalid Path: ${req.url}`);
+  res.status(404).json({ message: `${req.url} is an invalid path` });
 });
 
-//error handling middleware
+// Centralized error handling middleware
 app.use((err, req, res, next) => {
-  console.log("Error name:", err.name);
-  console.log("Error code:", err.code);
-  console.log("Full error:", err);
+  console.error("Error encountered:", {
+    name: err.name,
+    code: err.code,
+    message: err.message
+  });
 
-  // mongoose validation error
+  // Mongoose validation error
   if (err.name === "ValidationError") {
     return res.status(400).json({
       message: "error occurred",
@@ -98,7 +88,7 @@ app.use((err, req, res, next) => {
     });
   }
 
-  // mongoose cast error
+  // Mongoose cast error (e.g., invalid ObjectIds)
   if (err.name === "CastError") {
     return res.status(400).json({
       message: "error occurred",
@@ -106,10 +96,11 @@ app.use((err, req, res, next) => {
     });
   }
 
+  // Handle Mongoose duplicate key codes (Error Code: 11000)
   const errCode = err.code ?? err.cause?.code ?? err.errorResponse?.code;
   const keyValue = err.keyValue ?? err.cause?.keyValue ?? err.errorResponse?.keyValue;
 
-  if (errCode === 11000) {
+  if (errCode === 11000 && keyValue) {
     const field = Object.keys(keyValue)[0];
     const value = keyValue[field];
     return res.status(409).json({
@@ -118,7 +109,7 @@ app.use((err, req, res, next) => {
     });
   }
 
-  // ✅ HANDLE CUSTOM ERRORS
+  // Handle explicitly thrown custom status errors
   if (err.status) {
     return res.status(err.status).json({
       message: "error occurred",
@@ -126,85 +117,29 @@ app.use((err, req, res, next) => {
     });
   }
 
-  // default server error
+  // Fallback default server error
   res.status(500).json({
     message: "error occurred",
     error: "Server side error",
   });
 });
-// app.use((err, req, res, next) => {
-//   console.log("Error name:", err.name);
-//   console.log("Error code:", err.code);
-//   console.log("Error cause:", err.cause);
-//   console.log("Full error:", JSON.stringify(err, null, 2));
-//   //ValidationError
-//   if (err.name === "ValidationError") {
-//     return res.status(400).json({ message: "error occurred", error: err.message });
-//   }
-//   //CastError
-//   if (err.name === "CastError") {
-//     return res.status(400).json({ message: "error occurred", error: err.message });
-//   }
-//   const errCode = err.code ?? err.cause?.code ?? err.errorResponse?.code;
-//   const keyValue = err.keyValue ?? err.cause?.keyValue ?? err.errorResponse?.keyValue;
 
-//   if (errCode === 11000) {
-//     const field = Object.keys(keyValue)[0];
-//     const value = keyValue[field];
-//     return res.status(409).json({
-//       message: "error occurred",
-//       error: `${field} "${value}" already exists`,
-//     });
-//   }
+// Asynchronous MongoDB connection setup
+const connectDB = async () => {
+  try {
+    if (!process.env.DB_URL) {
+      throw new Error("DB_URL is missing inside your environment configuration (.env) file.");
+    }
+    await connect(process.env.DB_URL);
+    console.log("DB connection success");
+  } catch (err) {
+    console.error("❌ Database connection failed:", err.message);
+  }
+};
 
-//   //send server side error
-//   res.status(500).json({ message: "error occurred", error: "Server side error" });
-// });
-// app.use((err, req, res, next) => {
-//   const status = err.status || err.statusCode || 500;
-//   const isProduction = process.env.NODE_ENV === "production";
+// Start MongoDB and the Express Server independently
+connectDB();
 
-//   let message = err.message || "Unexpected error";
-//   let details;
-
-//   // Mongoose validation errors
-//   if (err.name === "ValidationError") {
-//     message = "Validation error";
-//     details = Object.values(err.errors || {}).map((e) => e.message);
-//   }
-
-//   // Mongoose cast errors (e.g. invalid ObjectId)
-//   if (err.name === "CastError") {
-//     message = "Invalid value for field";
-//     details = [`${err.path} is invalid`];
-//   }
-
-//   // Duplicate key errors
-//   if (err.code === 11000) {
-//     message = "Duplicate value";
-//     const fields = Object.keys(err.keyValue || {});
-//     details = fields.length ? fields.map((f) => `${f} already exists`) : undefined;
-//   }
-
-//   // Strict mode "throw" errors from schema
-//   if (err.name === "StrictModeError") {
-//     message = "Invalid fields provided";
-//     details = err.path ? [`${err.path} is not allowed`] : undefined;
-//   }
-
-//   // Default to 400 for known client errors without explicit status
-//   const finalStatus = status === 500 && (err.name || err.code) ? 400 : status;
-
-//   const response = {
-//     message,
-//     status: finalStatus,
-//   };
-
-//   if (details) response.details = details;
-//   if (!isProduction) {
-//     response.stack = err.stack;
-//   }
-
-//   console.log("err :", err);
-//   res.status(finalStatus).json(response);
-// });
+app.listen(PORT, () => {
+  console.log(`🚀 Server actively listening on port ${PORT}`);
+});
