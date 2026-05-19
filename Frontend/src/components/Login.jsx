@@ -14,7 +14,7 @@ import {
 import { NavLink } from "react-router";
 import { useAuth } from "../stores/authStore";
 import { useEffect } from "react";
-import { useNavigate,useLocation } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import { toast } from "react-hot-toast";
 
 function Login() {
@@ -24,22 +24,22 @@ function Login() {
   const currentUser = useAuth((state) => state.currentUser);
   const error = useAuth((state) => state.error);
   const navigate = useNavigate();
-  const location=useLocation()
+  const location = useLocation();
 
-
-  // console.log("Is Authenticated :", isAuthenticated);
-  // console.log("Current usr", currentUser);
-  // console.log("error is ", error);
   const onUserLogin = async (userCredObj) => {
-    await login(userCredObj);
+    // CRITICAL MAP: Map 'email' field to 'username' because backend expects 'username'
+    const payload = {
+      username: userCredObj.email, 
+      password: userCredObj.password
+    };
+    await login(payload);
   };
 
- 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && currentUser) {
       if (location.pathname === "/login") {
         if (currentUser.role === "USER") {
-          toast.success("Loggedin successfully");
+          toast.success("Logged in successfully");
           navigate("/user-profile");
         } else if (currentUser.role === "AUTHOR") {
           navigate("/author-profile");
@@ -60,13 +60,13 @@ function Login() {
           {/* Email */}
           <div className={formGroup}>
             <label className={labelClass}>Email</label>
-            <input type="email" {...register("email")} placeholder="you@example.com" className={inputClass} />
+            <input type="email" {...register("email", { required: true })} placeholder="you@example.com" className={inputClass} />
           </div>
 
           {/* Password */}
           <div className={formGroup}>
             <label className={labelClass}>Password</label>
-            <input type="password" {...register("password")} placeholder="••••••••" className={inputClass} />
+            <input type="password" {...register("password", { required: true })} placeholder="••••••••" className={inputClass} />
           </div>
 
           {/* Forgot password */}

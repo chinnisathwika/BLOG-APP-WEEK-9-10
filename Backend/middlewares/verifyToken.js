@@ -8,15 +8,15 @@ const getJwtSecret = () => {
     err.status = 500;
     throw err;
   }
-
   return process.env.JWT_SECRET;
 };
 
 export const verifyToken = (...allowedRoles) => {
   return async (req, res, next) => {
     try {
-      // Read token from cookie
-      const token = req.cookies.token;
+      // Read token from cookies (Ensure cookie-parser middleware is configured on your main app file!)
+      const token = req.cookies ? req.cookies.token : null;
+      
       if (!token) {
         return res.status(401).json({ message: "Unauthorized. Please login" });
       }

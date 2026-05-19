@@ -9,7 +9,7 @@ import { uploadToCloudinary } from "../config/cloudinaryUpload.js";
 export const userRoute = exp.Router();
 
 // ==========================================
-// 🔐 AUTHENTICATION ROUTES (ADD THIS)
+// 🔐 AUTHENTICATION ROUTES
 // ==========================================
 
 // Login User & Set Secure Cross-Domain Cookie
@@ -17,10 +17,10 @@ userRoute.post("/login", async (req, res, next) => {
   try {
     const { username, password } = req.body;
     
-    // Authenticate user (calls your existing service to check password & generate token)
+    // Authenticate user
     const { user, token } = await authenticate({ username, password });
 
-    // ⚠️ CRITICAL FIX: Configure cookie to bypass cross-domain (Vercel to Render) restrictions
+    // Configure cookie to bypass cross-domain (Vercel to Render) restrictions
     res.cookie("token", token, {
       httpOnly: true,         // Protects against XSS attacks
       secure: true,           // Required for HTTPS (Render production env)
