@@ -87,7 +87,9 @@ userRoute.post("/users", upload.single("profileImageUrl"), async (req, res, next
 userRoute.get("/articles", verifyToken("USER"), async (req, res, next) => {
   try {
     // Read articles of all authors which are active
-    const articles = await ArticleModel.find({ isArticleActive: true }).populate("author");
+    const articles = await ArticleModel.find({ isArticleActive: true })
+      .populate("author", "firstName email")
+      .populate("comments.user", "firstName lastName email profileImageUrl");
     res.status(200).json({ message: "all articles", payload: articles });
   } catch (err) {
     next(err);
@@ -110,7 +112,9 @@ userRoute.put("/articles", verifyToken("USER"), async (req, res, next) => {
       { _id: articleId, isArticleActive: true },
       { $push: { comments: { user, comment } } },
       { new: true, runValidators: true },
-    );
+    )
+      .populate("author", "firstName email")
+      .populate("comments.user", "firstName lastName email profileImageUrl");
 
     // If article not found
     if (!articleWithComment) {
@@ -118,6 +122,38 @@ userRoute.put("/articles", verifyToken("USER"), async (req, res, next) => {
     }
 
     res.status(200).json({ message: "comment added successfully", payload: articleWithComment });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delete own comment from an article
+userRoute.delete("/articles/:articleId/comments/:commentId", verifyToken("USER"), async (req, res, next) => {
+  try {
+    const { articleId, commentId } = req.params;
+    const article = await ArticleModel.findById(articleId);
+
+    if (!article) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+    const comment = article.comments.id(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    if (comment.user.toString() !== req.user.userId) {
+      return res.status(403).json({ message: "You can delete only your own comment" });
+    }
+
+    article.comments.pull(commentId);
+    await article.save();
+
+    const updatedArticle = await ArticleModel.findById(articleId)
+      .populate("author", "firstName email")
+      .populate("comments.user", "firstName lastName email profileImageUrl");
+
+    res.status(200).json({ message: "comment deleted", payload: updatedArticle });
   } catch (err) {
     next(err);
   }

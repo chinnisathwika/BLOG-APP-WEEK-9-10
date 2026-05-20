@@ -61,7 +61,9 @@ authorRoute.get("/articles/:authorId", verifyToken("AUTHOR"), async (req, res) =
   let aid = req.params.authorId;
 
   //read atricles by this author which are acticve
-  let articles = await ArticleModel.find({ author: aid }).populate("author", "firstName email");
+  let articles = await ArticleModel.find({ author: aid })
+    .populate("author", "firstName email")
+    .populate("comments.user", "firstName lastName email profileImageUrl");
   //send res
   res.status(200).json({ message: "articles", payload: articles });
 });
@@ -124,4 +126,36 @@ authorRoute.patch("/articles/:id/status", verifyToken("AUTHOR"), async (req, res
     message: `Article ${isArticleActive ? "restored" : "deleted"} successfully`,
     payload: article, // ✅ use payload instead of article
   });
+});
+
+//delete a comment from author's own article
+authorRoute.delete("/articles/:articleId/comments/:commentId", verifyToken("AUTHOR"), async (req, res, next) => {
+  try {
+    const { articleId, commentId } = req.params;
+    const article = await ArticleModel.findById(articleId);
+
+    if (!article) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+    if (article.author.toString() !== req.user.userId) {
+      return res.status(403).json({ message: "Forbidden. You can only manage comments on your own articles" });
+    }
+
+    const comment = article.comments.id(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    article.comments.pull(commentId);
+    await article.save();
+
+    const updatedArticle = await ArticleModel.findById(articleId)
+      .populate("author", "firstName email")
+      .populate("comments.user", "firstName lastName email profileImageUrl");
+
+    res.status(200).json({ message: "comment deleted", payload: updatedArticle });
+  } catch (err) {
+    next(err);
+  }
 });

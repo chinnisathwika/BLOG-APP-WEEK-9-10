@@ -1,6 +1,7 @@
 import exp from "express";
 import { authenticate } from "../services/authService.js";
 import { UserTypeModel } from "../models/UserModel.js";
+import { ArticleModel } from "../models/ArticleModel.js";
 import bcrypt from "bcryptjs";
 import { verifyToken } from "../middlewares/verifyToken.js";
 export const commonRouter = exp.Router();
@@ -74,9 +75,31 @@ commonRouter.get("/check-auth", (req, res, next) => {
   }
 
   next();
-}, verifyToken("USER","AUTHOR","ADMIN"), (req, res) => {
-  res.status(200).json({
-    message: "authenticated",
-    payload: req.user
-  });
+}, verifyToken("USER","AUTHOR","ADMIN"), async (req, res, next) => {
+  try {
+    const user = await UserTypeModel.findById(req.user.userId).select("-password");
+
+    res.status(200).json({
+      message: user ? "authenticated" : "not authenticated",
+      payload: user,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+commonRouter.get("/articles/:id", async (req, res, next) => {
+  try {
+    const article = await ArticleModel.findById(req.params.id)
+      .populate("author", "firstName email")
+      .populate("comments.user", "firstName lastName email profileImageUrl");
+
+    if (!article) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+    res.status(200).json({ message: "article", payload: article });
+  } catch (err) {
+    next(err);
+  }
 });
