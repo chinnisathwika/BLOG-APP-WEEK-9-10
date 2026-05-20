@@ -5,11 +5,16 @@ import bcrypt from "bcryptjs";
 import { verifyToken } from "../middlewares/verifyToken.js";
 export const commonRouter = exp.Router();
 
-const isProduction = process.env.NODE_ENV === "production";
-const authCookieOptions = {
-  httpOnly: true,
-  sameSite: isProduction ? "none" : "lax",
-  secure: isProduction,
+const getAuthCookieOptions = (req) => {
+  const origin = req.get("origin") || "";
+  const isSecureRequest =
+    process.env.NODE_ENV === "production" || origin.startsWith("https://") || req.get("x-forwarded-proto") === "https";
+
+  return {
+    httpOnly: true,
+    sameSite: isSecureRequest ? "none" : "lax",
+    secure: isSecureRequest,
+  };
 };
 
 //login
@@ -19,7 +24,7 @@ commonRouter.post("/login", async (req, res) => {
   //call authenticate service
   let { token, user } = await authenticate(userCred);
   //save tokan as httpOnly cookie
-  res.cookie("token", token, authCookieOptions);
+  res.cookie("token", token, getAuthCookieOptions(req));
   //send res
   res.status(200).json({ message: "login success", payload: user });
 });
@@ -27,7 +32,7 @@ commonRouter.post("/login", async (req, res) => {
 //logout for User, Author and Admin
 commonRouter.get("/logout", (req, res) => {
   // Clear the cookie named 'token'
-  res.clearCookie("token", authCookieOptions);
+  res.clearCookie("token", getAuthCookieOptions(req));
 
   res.status(200).json({ message: "Logged out successfully" });
 });
@@ -60,7 +65,16 @@ commonRouter.put("/change-password", async (req, res) => {
 });
 
 //Page refresh
-commonRouter.get("/check-auth", verifyToken("USER","AUTHOR","ADMIN"), (req, res) => {
+commonRouter.get("/check-auth", (req, res, next) => {
+  if (!req.cookies?.token) {
+    return res.status(200).json({
+      message: "not authenticated",
+      payload: null,
+    });
+  }
+
+  next();
+}, verifyToken("USER","AUTHOR","ADMIN"), (req, res) => {
   res.status(200).json({
     message: "authenticated",
     payload: req.user

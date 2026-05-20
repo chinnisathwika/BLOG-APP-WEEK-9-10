@@ -4,7 +4,7 @@ import { apiUrl } from "../config/api";
 
 export const useAuth = create((set) => ({
   currentUser: null,
-  loading: false,
+  loading: true,
   isAuthenticated: false,
   error: null,
   login: async (userCredWithRole) => {
@@ -21,7 +21,6 @@ export const useAuth = create((set) => ({
         currentUser: res.data.payload, //{message:"",payload:}
       });
     } catch (err) {
-      console.log("err is ", err);
       set({
         loading: false,
         isAuthenticated: false,
@@ -57,11 +56,13 @@ export const useAuth = create((set) => ({
     try {
       set({ loading: true });
       const res = await axios.get(apiUrl("/common-api/check-auth"), { withCredentials: true });
+      const user = res.data.payload || null;
 
       set({
-        currentUser: res.data.payload,
-        isAuthenticated: true,
+        currentUser: user,
+        isAuthenticated: Boolean(user),
         loading: false,
+        error: null,
       });
     } catch (err) {
       // If user is not logged in → do nothing
@@ -75,8 +76,12 @@ export const useAuth = create((set) => ({
       }
 
       // other errors
-      console.error("Auth check failed:", err);
-      set({ loading: false });
+      set({
+        currentUser: null,
+        isAuthenticated: false,
+        loading: false,
+        error: err.response?.data?.error || err.response?.data?.message || "Auth check failed",
+      });
     }
   },
 }));

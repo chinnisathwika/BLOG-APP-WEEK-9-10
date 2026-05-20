@@ -25,6 +25,8 @@ function UserProfile() {
   const [articles, setArticles] = useState([]);
 
   useEffect(() => {
+    if (!currentUser) return;
+
     const getArticles = async () => {
       setLoading(true);
       setError(null);
@@ -43,7 +45,7 @@ function UserProfile() {
     };
 
     getArticles();
-  }, []);
+  }, [currentUser]);
 
   // convert UTC → IST
   const formatDateIST = (date) => {

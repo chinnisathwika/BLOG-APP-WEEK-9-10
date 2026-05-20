@@ -27,12 +27,7 @@ function Login() {
   const location = useLocation();
 
   const onUserLogin = async (userCredObj) => {
-    // CRITICAL MAP: Map 'email' field to 'username' because backend expects 'username'
-    const payload = {
-      username: userCredObj.email, 
-      password: userCredObj.password
-    };
-    await login(payload);
+    await login(userCredObj);
   };
 
   useEffect(() => {
